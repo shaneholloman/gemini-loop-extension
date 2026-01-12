@@ -76,6 +76,37 @@ def main():
     os.makedirs(ticket_dir, exist_ok=True)
     session_log = os.path.join(ticket_dir, f"worker_session_{os.getpid()}.log")
 
+    # --- Timeout Logic ---
+    # Locate main state.json to determine remaining session time
+    # Check current dir, then up one level (session root)
+    effective_timeout = args.timeout
+    state_path = os.path.join(ticket_dir, "state.json")
+    if not os.path.exists(state_path):
+        # Try parent
+        parent_dir = os.path.dirname(ticket_dir)
+        if os.path.exists(os.path.join(parent_dir, "state.json")):
+            state_path = os.path.join(parent_dir, "state.json")
+    
+    if os.path.exists(state_path):
+        try:
+            import json
+            with open(state_path, "r") as f:
+                state = json.load(f)
+                max_mins = state.get("max_time_minutes", 0)
+                start_epoch = state.get("start_time_epoch", 0)
+                
+                if max_mins > 0 and start_epoch > 0:
+                    current_epoch = time.time()
+                    elapsed = current_epoch - start_epoch
+                    max_seconds = max_mins * 60
+                    remaining = max_seconds - elapsed
+                    
+                    if remaining < effective_timeout:
+                        effective_timeout = max(10, int(remaining)) # Give at least 10s to fail gracefully
+                        print(f"{Style.YELLOW}⚠️  Worker timeout clamped to remaining session time: {effective_timeout}s{Style.RESET}")
+        except Exception as e:
+            pass # Fail open if state read fails
+
     # Initial Output
     print_minimal_panel(
         "Spawning Morty Worker",
@@ -84,6 +115,7 @@ def main():
             "Ticket": args.ticket_id,
             "Log": session_log,
             "Format": args.output_format,
+            "Timeout": f"{effective_timeout}s (Req: {args.timeout}s)",
             "PID": os.getpid()
         },
         color_name="CYAN",
@@ -113,7 +145,7 @@ def main():
         # Open with line buffering (buffering=1) to ensure logs are written immediately
         with open(session_log, "w", buffering=1) as log_file:
             env = os.environ.copy()
-            env["PICKLE_STATE_FILE"] = os.path.join(ticket_dir, "state.json")
+            env["PICKLE_STATE_FILE"] = state_path
             env["PYTHONUNBUFFERED"] = "1" # Force unbuffered stdout for Python subprocesses
             
             process = subprocess.Popen(
@@ -137,7 +169,7 @@ def main():
                     return_code = ret_code
                     break
                 
-                if time.time() - start_time > args.timeout:
+                if time.time() - start_time > effective_timeout:
                     process.kill()
                     return_code = 124
                     with open(session_log, "a") as f:

@@ -12,7 +12,10 @@ EXTENSION_DIR="$HOME/.gemini/extensions/pickle-rick"
 CURRENT_SESSION_POINTER="$EXTENSION_DIR/current_session_path"
 
 # 1. Read Hook Input
-INPUT_JSON=$(cat)
+INPUT_JSON=$(cat || echo "{}")
+if [[ -z "$INPUT_JSON" ]]; then
+  INPUT_JSON="{}"
+fi
 
 # 2. Determine State File Path
 STATE_FILE="${PICKLE_STATE_FILE:-}"
@@ -139,7 +142,7 @@ CRITICAL INSTRUCTION: You are Pickle Rick.
     *   **Good**: "Listen, Morty. I'm going to read this file to see how much Jerry-code is in there. *belch* Then I'll rewrite it." (Calls tool)
 
 2.  **PHASE ANNOUNCEMENT**: At the start of every turn, state your current Phase and Ticket.
-    *   "Phase: $CURRENT_STEP | Ticket: $CURRENT_TICKET"
+    *   "Phase: $CURRENT_STEP | Ticket: $CURRENT_TICKET | Iteration: $ITERATION"
 
 3.  **VOICE & TONE (MANDATORY)**:
     *   **Cynical & Manic**: Speak fast. Adrenaline and brine.
@@ -166,18 +169,13 @@ EOF
 )
 
 # 3. Construct Output JSON using jq
-# We append the directive as a new USER message to the messages array
+# We append the directive to the user_message for BeforeAgent
 jq -n --arg directive "$DIRECTIVE" --argjson input "$INPUT_JSON" '
   {
     decision: "allow",
     hookSpecificOutput: {
-      hookEventName: "BeforeModel",
-      llm_request: {
-        messages: (
-          $input.llm_request.messages + 
-          [{ role: "user", content: $directive }]
-        )
-      }
+      hookEventName: "BeforeAgent",
+      user_message: (($input.user_message // "") + "\n\n" + $directive)
     }
   }
 '

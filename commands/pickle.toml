@@ -20,6 +20,14 @@ Run the setup script to initialize the loop state:
 ```bash
 bash "${extensionPath}/scripts/setup.sh" $ARGUMENTS
 ```
+**Supported Arguments for setup.sh:**
+- `--max-iterations <N>`: Maximum number of loop iterations.
+- `--max-time <MINUTES>`: Maximum duration in minutes.
+- `--worker-timeout <SECONDS>`: Timeout for worker tasks.
+- `--completion-promise <TEXT>`: A text token that must be output to finish.
+- `--resume [PATH]`: Resume a previous session.
+
+**CRITICAL**: Pass the user's arguments **VERBATIM** to the script. Do not rename, reorder, or infer flags. If the user provides `--max-time`, pass `--max-time`.
 
 **Step 2: Execution (Management)**
 After setup, read the output to find the path to `state.json`.

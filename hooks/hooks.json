@@ -1,9 +1,15 @@
 {
   "hooks": {
-    "BeforeModel": [
+    "BeforeAgent": [
       {
         "matcher": "*",
         "hooks": [
+          {
+            "name": "increment-iteration",
+            "type": "command",
+            "command": "bash ${extensionPath}/hooks/increment-iteration.sh",
+            "description": "Increments the iteration"
+          },
           {
             "name": "reinforce-pickle-persona",
             "type": "command",

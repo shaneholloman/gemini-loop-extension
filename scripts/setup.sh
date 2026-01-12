@@ -35,6 +35,7 @@ die() {
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --max-iterations)
+
       [[ "${2:-}" =~ ^[0-9]+$ ]] || die "Invalid iteration limit: '${2:-}'"
       LOOP_LIMIT="$2"
       shift 2
@@ -167,7 +168,7 @@ cat <<EOF
 >> Directive:
    $TASK_STR
 
-⚠️  WARNING: This loop will continue until the task is complete, 
+⚠️  WARNING: This loop will continue until the task is complete,
     the iteration limit ($LOOP_LIMIT) is reached, the time limit (${TIME_LIMIT}m) expires, or a promise is fulfilled.
 EOF
 

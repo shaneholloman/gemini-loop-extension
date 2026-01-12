@@ -55,6 +55,9 @@ This creates a self-referential feedback loop where:
 ### ⚠️ Warning
 **This loop will continue until the task is complete, the `max-iterations` (default: 3) is reached, the `max-time` (default: 60m) expires, or a `completion-promise` is fulfilled.** (Note: Individual workers have a 20m timeout).
 
+> [!IMPORTANT]
+> Currently, the `--max-iterations` and `--max-time` constraints are **not working correctly**. The loop may continue indefinitely if a completion promise is not met. Please monitor your Pickle Rick session closely and use `/eat-pickle` to manually stop it if necessary.
+
 ## ✅ When to Use Pickle Rick
 
 **Good for:**
@@ -84,8 +87,8 @@ To initiate the iterative development loop:
 ```
 
 **Options:**
-- `--max-iterations <N>`: Stop after N iterations (default: 3).
-- `--max-time <M>`: Stop after M minutes (default: 60). (Worker timeout default: 20m).
+- `--max-iterations <N>`: Stop after N iterations (default: 3). **(Currently non-functional)**
+- `--max-time <M>`: Stop after M minutes (default: 60). (Worker timeout default: 20m). **(Currently non-functional)**
 - `--worker-timeout <S>`: Timeout for individual workers in seconds (default: 1200).
 - `--name <SLUG>`: Custom name for the session directory.
 - `--completion-promise "TEXT"`: Only stop when the agent outputs `<promise>TEXT</promise>`.
@@ -116,8 +119,24 @@ If a session was interrupted or started via `/pickle-prd`, resume it using:
 ```
 *Note: This resumes the session pointed to by `current_session_path`.*
 
-### ⚙️ Important Configuration (includeDirectories)
-To ensure Pickle Rick can track its thoughts, manage Linear tickets, and persist session state, you **must** add the extension's data directory to your Gemini `includeDirectories` configuration (usually in your `.geminirc` or settings).
+### ⚙️ Important Configuration
+
+To ensure Pickle Rick functions correctly, you must:
+
+1.  **Enable Hooks**: The extension relies on hooks to enforce the persona and manage the loop. Add this to your `.gemini/settings.json` (Project or User level):
+
+    ```json
+    {
+      "tools": {
+        "enableHooks": true
+      },
+      "hooks": {
+        "enabled": true
+      }
+    }
+    ```
+
+2.  **Include Directories**: To ensure Pickle Rick can track its thoughts, manage Linear tickets, and persist session state, you **must** add the extension's data directory to your Gemini `includeDirectories` configuration (usually in your `.gemini/settings.json`).
 
 Add the following path:
 ```bash

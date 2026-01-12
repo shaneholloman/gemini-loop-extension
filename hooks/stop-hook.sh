@@ -56,6 +56,8 @@ CURRENT_TIME=$(date +%s)
 ELAPSED_SECONDS=$((CURRENT_TIME - START_TIME))
 MAX_TIME_SECONDS=$((MAX_TIME_MINS * 60))
 
+echo "[StopHook] Time Check | Elapsed: $ELAPSED_SECONDS / $MAX_TIME_SECONDS (Max Mins: $MAX_TIME_MINS)" >> "$EXTENSION_DIR/debug.log"
+
 if [[ "$MAX_TIME_MINS" -gt 0 ]] && [[ "$ELAPSED_SECONDS" -ge "$MAX_TIME_SECONDS" ]]; then
   # Time limit reached -> Allow exit
   TMP_STATE=$(mktemp)
@@ -91,24 +93,21 @@ fi
 
 # 6. Continue Loop (Prevent Exit)
 
-# Increment iteration
-NEXT_ITERATION=$((ITERATION + 1))
-TMP_STATE=$(mktemp)
-jq --argjson iter "$NEXT_ITERATION" '.iteration = $iter' "$STATE_FILE" > "$TMP_STATE" && mv "$TMP_STATE" "$STATE_FILE"
-
 # Construct Feedback Message
-FEEDBACK="🥒 **Pickle Rick Loop Active** (Iteration $NEXT_ITERATION)"
+FEEDBACK="🥒 **Pickle Rick Loop Active** (Iteration $ITERATION)"
 if [[ "$MAX_ITERATIONS" -gt 0 ]]; then
   FEEDBACK="$FEEDBACK of $MAX_ITERATIONS"
 fi
 
 # Output JSON to prevent exit and send new prompt
-# In Gemini CLI, 'block' decision in AfterAgent forces recursion with 'reason' as the next prompt
 jq -n \
   --arg prompt "$ORIGINAL_PROMPT" \
   --arg feedback "$FEEDBACK" \
-  '{ 
-    decision: "block",
-    reason: $prompt,
-    systemMessage: $feedback
+  '{
+    "decision": "block",
+    "systemMessage": $feedback,
+    "hookSpecificOutput": {
+      "hookEventName": "AfterAgent",
+      "additionalContext": $prompt
+    }
   }'
