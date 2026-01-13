@@ -19,6 +19,19 @@
         ]
       }
     ],
+    "BeforeModel": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "check-limit",
+            "type": "command",
+            "command": "bash ${extensionPath}/hooks/check-limit.sh",
+            "description": "Checks if the iteration or time limit has been reached"
+          }
+        ]
+      }
+    ],
     "AfterAgent": [
       {
         "matcher": "*",

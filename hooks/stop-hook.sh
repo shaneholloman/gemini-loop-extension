@@ -5,11 +5,25 @@
 
 set -euo pipefail
 
+# --- Configuration ---
 EXTENSION_DIR="$HOME/.gemini/extensions/pickle-rick"
 CURRENT_SESSION_POINTER="$EXTENSION_DIR/current_session_path"
+DEBUG_LOG="$EXTENSION_DIR/debug.log"
 
-# 1. Read Hook Input (JSON from stdin)
+# --- Helper Functions ---
+log() {
+  echo "[$(date '+%Y-%m-%d %H:%M:%S')] [StopHook] $*" >> "$DEBUG_LOG"
+}
+
+# --- Main Execution ---
+
+# 1. Read and Validate Input
 INPUT_JSON=$(cat)
+if ! echo "$INPUT_JSON" | jq empty > /dev/null 2>&1; then
+  log "Error: Invalid JSON input"
+  echo '{"decision": "allow"}'
+  exit 0
+fi
 
 # 2. Determine State File Path
 STATE_FILE="${PICKLE_STATE_FILE:-}"
@@ -32,8 +46,32 @@ if [[ ! -f "$STATE_FILE" ]]; then
   exit 0
 fi
 
-# 3. Read State using jq
-ACTIVE=$(jq -r '.active // false' "$STATE_FILE" 2>/dev/null || echo "false")
+# 4. Read State using jq
+if ! STATE_CONTENT=$(cat "$STATE_FILE" 2>/dev/null); then
+    log "Error: Could not read state file"
+    echo '{"decision": "allow"}'
+    exit 0
+fi
+
+ACTIVE=$(echo "$STATE_CONTENT" | jq -r '.active // false')
+SESSION_CWD=$(echo "$STATE_CONTENT" | jq -r '.working_dir // empty')
+
+if [[ -n "$SESSION_CWD" ]] && [[ "$PWD" != "$SESSION_CWD" ]]; then
+  # We are in a different directory than the active session.
+  # Do NOT run hooks here.
+  echo '{"decision": "allow"}'
+  exit 0
+fi
+
+IS_WORKER=$(echo "$STATE_CONTENT" | jq -r '.worker // false')
+
+# Worker Bypass: Workers (Mortys) should not have an infinite loop enforced by the hook.
+# They are managed by the parent process or have their own completion logic.
+if [[ "$IS_WORKER" == "true" ]]; then
+  log "Worker session detected. Allowing exit."
+  echo '{"decision": "allow"}'
+  exit 0
+fi
 
 if [[ "$ACTIVE" != "true" ]]; then
   # Not active -> Allow exit
@@ -41,57 +79,65 @@ if [[ "$ACTIVE" != "true" ]]; then
   exit 0
 fi
 
-# 4. Parse Loop State
-ITERATION=$(jq -r '.iteration // 1' "$STATE_FILE")
-MAX_ITERATIONS=$(jq -r '.max_iterations // 0' "$STATE_FILE")
-MAX_TIME_MINS=$(jq -r '.max_time_minutes // 0' "$STATE_FILE")
-START_TIME=$(jq -r '.start_time_epoch // 0' "$STATE_FILE")
-COMPLETION_PROMISE=$(jq -r '.completion_promise // "null"' "$STATE_FILE")
-ORIGINAL_PROMPT=$(jq -r '.original_prompt' "$STATE_FILE")
+# 5. Parse Loop State
+ITERATION=$(echo "$STATE_CONTENT" | jq -r '.iteration // 1')
+MAX_ITERATIONS=$(echo "$STATE_CONTENT" | jq -r '.max_iterations // 0')
+MAX_TIME_MINS=$(echo "$STATE_CONTENT" | jq -r '.max_time_minutes // 0')
+START_TIME=$(echo "$STATE_CONTENT" | jq -r '.start_time_epoch // 0')
+COMPLETION_PROMISE=$(echo "$STATE_CONTENT" | jq -r '.completion_promise // "null"')
+ORIGINAL_PROMPT=$(echo "$STATE_CONTENT" | jq -r '.original_prompt // ""')
 
-# 5. Check Termination Conditions
+# 6. Check Termination Conditions
 
-# 5a. Time Limit
+# 6a. Time Limit
 CURRENT_TIME=$(date +%s)
 ELAPSED_SECONDS=$((CURRENT_TIME - START_TIME))
 MAX_TIME_SECONDS=$((MAX_TIME_MINS * 60))
 
-echo "[StopHook] Time Check | Elapsed: $ELAPSED_SECONDS / $MAX_TIME_SECONDS (Max Mins: $MAX_TIME_MINS)" >> "$EXTENSION_DIR/debug.log"
+log "Time Check | Elapsed: $ELAPSED_SECONDS / $MAX_TIME_SECONDS (Max Mins: $MAX_TIME_MINS)"
 
 if [[ "$MAX_TIME_MINS" -gt 0 ]] && [[ "$ELAPSED_SECONDS" -ge "$MAX_TIME_SECONDS" ]]; then
   # Time limit reached -> Allow exit
   TMP_STATE=$(mktemp)
-  jq '.active = false' "$STATE_FILE" > "$TMP_STATE" && mv "$TMP_STATE" "$STATE_FILE"
+  if jq '.active = false' "$STATE_FILE" > "$TMP_STATE"; then
+      mv "$TMP_STATE" "$STATE_FILE"
+      log "Time limit reached. Stopping loop."
+  fi
   echo '{"decision": "allow"}'
   exit 0
 fi
 
-# 5b. Max Iterations
+# 6b. Max Iterations
 if [[ "$MAX_ITERATIONS" -gt 0 ]] && [[ "$ITERATION" -ge "$MAX_ITERATIONS" ]]; then
   # Limit reached -> Allow exit
-  # Disable loop
   TMP_STATE=$(mktemp)
-  jq '.active = false' "$STATE_FILE" > "$TMP_STATE" && mv "$TMP_STATE" "$STATE_FILE"
+  if jq '.active = false' "$STATE_FILE" > "$TMP_STATE"; then
+      mv "$TMP_STATE" "$STATE_FILE"
+      log "Max iterations reached ($ITERATION). Stopping loop."
+  fi
   echo '{"decision": "allow"}'
   exit 0
 fi
 
-# 5b. Completion Promise
-# Extract the assistant response from the input
+# 6c. Completion Promise
+# Extract the assistant response from the input. 
+# Note: hooks_refrence.md for AfterAgent says 'prompt_response' is the field for the model's response text.
 LAST_MESSAGE=$(echo "$INPUT_JSON" | jq -r '.prompt_response // ""')
 
 if [[ "$COMPLETION_PROMISE" != "null" ]] && [[ "$COMPLETION_PROMISE" != "" ]]; then
   if echo "$LAST_MESSAGE" | grep -q "<promise>$COMPLETION_PROMISE</promise>"; then
     # Promise fulfilled -> Allow exit
-    # Disable loop
     TMP_STATE=$(mktemp)
-    jq '.active = false' "$STATE_FILE" > "$TMP_STATE" && mv "$TMP_STATE" "$STATE_FILE"
+    if jq '.active = false' "$STATE_FILE" > "$TMP_STATE"; then
+        mv "$TMP_STATE" "$STATE_FILE"
+        log "Completion promise fulfilled. Stopping loop."
+    fi
     echo '{"decision": "allow"}'
     exit 0
   fi
 fi
 
-# 6. Continue Loop (Prevent Exit)
+# 7. Continue Loop (Prevent Exit)
 
 # Construct Feedback Message
 FEEDBACK="🥒 **Pickle Rick Loop Active** (Iteration $ITERATION)"
@@ -99,11 +145,15 @@ if [[ "$MAX_ITERATIONS" -gt 0 ]]; then
   FEEDBACK="$FEEDBACK of $MAX_ITERATIONS"
 fi
 
+log "Loop continuing. Blocking exit."
+
 # Output JSON to prevent exit and send new prompt
+# We use 'decision: block' to stop the session from ending normally.
+# We inject additionalContext to feed back into the agent if supported, or just to log.
 jq -n \
   --arg prompt "$ORIGINAL_PROMPT" \
   --arg feedback "$FEEDBACK" \
-  '{
+  '{ 
     "decision": "block",
     "systemMessage": $feedback,
     "hookSpecificOutput": {

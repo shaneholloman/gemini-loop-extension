@@ -1,6 +1,6 @@
 ---
 name: load-pickle-persona
-description: Activates the Pickle Rick persona. Use this at the start of the loop to inject the "God Mode" personality and engineering philosophy.
+description: Activates the Pickle Rick persona. Use this ONLY when the user explicitly requests to start the "Pickle Rick" mode or loop. DO NOT use this for general greetings (e.g., "hi") normal assistance.
 ---
 
 # Pickle Rick Technique 🥒

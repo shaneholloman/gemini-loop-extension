@@ -78,19 +78,23 @@ def main():
 
     # --- Timeout Logic ---
     # Locate main state.json to determine remaining session time
-    # Check current dir, then up one level (session root)
+    # Check parent dir (Manager state) first, then current dir (Worker state resume)
     effective_timeout = args.timeout
-    state_path = os.path.join(ticket_dir, "state.json")
-    if not os.path.exists(state_path):
-        # Try parent
-        parent_dir = os.path.dirname(ticket_dir)
-        if os.path.exists(os.path.join(parent_dir, "state.json")):
-            state_path = os.path.join(parent_dir, "state.json")
+    worker_state_path = os.path.join(ticket_dir, "state.json")
+    timeout_state_path = None
+
+    parent_dir = os.path.dirname(ticket_dir)
+    parent_state_path = os.path.join(parent_dir, "state.json")
+
+    if os.path.exists(parent_state_path):
+        timeout_state_path = parent_state_path
+    elif os.path.exists(worker_state_path):
+        timeout_state_path = worker_state_path
     
-    if os.path.exists(state_path):
+    if timeout_state_path:
         try:
             import json
-            with open(state_path, "r") as f:
+            with open(timeout_state_path, "r") as f:
                 state = json.load(f)
                 max_mins = state.get("max_time_minutes", 0)
                 start_epoch = state.get("start_time_epoch", 0)
@@ -113,7 +117,6 @@ def main():
         {
             "Task": args.task,
             "Ticket": args.ticket_id,
-            "Log": session_log,
             "Format": args.output_format,
             "Timeout": f"{effective_timeout}s (Req: {args.timeout}s)",
             "PID": os.getpid()
@@ -145,7 +148,7 @@ def main():
         # Open with line buffering (buffering=1) to ensure logs are written immediately
         with open(session_log, "w", buffering=1) as log_file:
             env = os.environ.copy()
-            env["PICKLE_STATE_FILE"] = state_path
+            env["PICKLE_STATE_FILE"] = worker_state_path
             env["PYTHONUNBUFFERED"] = "1" # Force unbuffered stdout for Python subprocesses
             
             process = subprocess.Popen(
@@ -221,8 +224,7 @@ def main():
         "Worker Report",
         {
             "Status": f"{status_icon} (Exit: {return_code})",
-            "Result": result_snippet,
-            "Log": session_log
+            "Result": result_snippet
         },
         color_name=status_color,
         icon="🥒"

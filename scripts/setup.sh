@@ -132,6 +132,7 @@ else
   cat > "$STATE_PATH" <<JSON
 {
   "active": true,
+  "working_dir": "$PWD",
   "step": "prd",
   "iteration": 1,
   "max_iterations": $LOOP_LIMIT,

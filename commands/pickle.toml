@@ -49,7 +49,10 @@ Between each step, you **MUST** explicitly state what you are doing (e.g., "Movi
     *   **Action**: Pick the highest priority ticket that is NOT 'Done'.
     *   **Delegation**: Spawn a Worker (Morty) to handle the entire implementation lifecycle for this ticket.
     *   **Command**: `python3 "${extensionPath}/scripts/spawn_worker.py" --ticket-id <ID> --ticket-path <PATH> --timeout <worker_timeout_seconds> "<TASK_DESCRIPTION>"`
-    *   **Validation**: Once the worker completes, you MUST validate the work. Run tests/builds.
+    *   **Validation**: IGNORE worker logs. DIRECTLY verify:
+        1. `git status` (Check for file changes)
+        2. `git diff` (Check code quality)
+        3. Run tests/build (Check functionality)
     *   **Cleanup**: If validation fails, REVERT changes (`git reset --hard`). If it passes, COMMIT changes.
     *   **Next Ticket**: Pick the next ticket and repeat.
 

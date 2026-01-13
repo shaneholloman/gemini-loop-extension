@@ -22,6 +22,13 @@ if [[ ! -f "$STATE_FILE" ]]; then
   exit 1
 fi
 
+# Check CWD
+SESSION_CWD=$(jq -r '.working_dir // empty' "$STATE_FILE")
+if [[ -n "$SESSION_CWD" ]] && [[ "$PWD" != "$SESSION_CWD" ]]; then
+  echo "❌ Cancelling Pickle Rick failed: You are in a different directory ($PWD) than the active session ($SESSION_CWD)." >&2
+  exit 1
+fi
+
 # Update state file to set active: false
 if [[ "$(uname)" == "Darwin" ]]; then
   # macOS sed requires empty string after -i
