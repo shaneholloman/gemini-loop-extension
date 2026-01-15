@@ -1,5 +1,17 @@
 # Pickle Rick Extension 🥒
 
+## 📥 Installation
+
+```bash
+gemini extensions install https://github.com/galz10/pickle-rick-extension
+```
+
+## 📋 Prerequisites
+
+- **Gemini CLI**: Version `> 0.25.0-preview.0`
+- **Agent Skills & Hooks**: Must be enabled in your Gemini configuration.
+- **Python 3.x**: Required for worker orchestration and management.
+
 > [!WARNING]
 > **USE AT YOUR OWN RISK.** This is a fun side project and experimental demonstration. It involves autonomous code modification and shell execution. While safety guardrails are in place, the agent may behave unexpectedly and consume a significant number of tokens.
 
@@ -55,9 +67,6 @@ This creates a self-referential feedback loop where:
 ### ⚠️ Warning
 **This loop will continue until the task is complete, the `max-iterations` (default: 3) is reached, the `max-time` (default: 60m) expires, or a `completion-promise` is fulfilled.** (Note: Individual workers have a 20m timeout).
 
-> [!IMPORTANT]
-> Currently, the `--max-iterations` and `--max-time` constraints are **not working correctly**. The loop may continue indefinitely if a completion promise is not met. Please monitor your Pickle Rick session closely and use `/eat-pickle` to manually stop it if necessary.
-
 ## ✅ When to Use Pickle Rick
 
 **Good for:**
@@ -71,12 +80,6 @@ This creates a self-referential feedback loop where:
 *   One-shot operations.
 *   Tasks with unclear success criteria.
 *   Production debugging (use targeted debugging instead).
-
-## 📋 Prerequisites
-
-- **Gemini CLI**: Version `> 0.24.0-preview.0`
-- **Agent Skills**: Must be enabled in your Gemini configuration.
-- **Python 3.x**: Required for worker orchestration and management.
 
 ## 🛠️ Usage
 
@@ -123,7 +126,7 @@ If a session was interrupted or started via `/pickle-prd`, resume it using:
 
 To ensure Pickle Rick functions correctly, you must:
 
-1.  **Enable Hooks**: The extension relies on hooks to enforce the persona and manage the loop. Add this to your `.gemini/settings.json` (Project or User level):
+2. **Enable Skills & Hooks**: The extension relies on hooks to enforce the persona and manage the loop, and "Skills" to execute specialized engineering tasks. Add this to your `.gemini/settings.json`:
 
     ```json
     {
@@ -132,6 +135,9 @@ To ensure Pickle Rick functions correctly, you must:
       },
       "hooks": {
         "enabled": true
+      },
+      "experimental": {
+        "skills": true
       }
     }
     ```
@@ -163,11 +169,17 @@ This extension provides specialized "Skills" that the agent activates during dif
 
 ## 📂 Project Structure
 
-- **`commands/`**: TOML definitions for CLI commands (`/pickle`, `/eat-pickle`).
-- **`scripts/`**: Bash scripts handling the logic (`setup.sh`, `cancel.sh`).
-- **`skills/`**: Markdown files defining the instructions for each specialized skill.
-- **`GEMINI.md`**: Context file loaded by the extension.
-- **`gemini-extension.json`**: Extension manifest.
+- **`.github/`**: GitHub Actions workflows for CI/CD and releases.
+- **`commands/`**: TOML definitions for all extension commands (e.g., `/pickle`, `/eat-pickle`, `/pickle-prd`).
+- **`hooks/`**: Bash hooks that manage the iterative loop and persona reinforcement.
+- **`resources/`**: Static assets like icons and images.
+- **`scripts/`**: Logic for session management, worker orchestration, and setup.
+- **`skills/`**: Detailed instructions for each specialized engineering skill.
+- **`gemini-extension.json`**: The extension's manifest file.
+- **`GEMINI.md`**: Global context file loaded by the extension.
+- **`LICENSE`**: Project licensing information.
+- **`MANUAL_TESTS.md`**: Guide for manual testing and verification.
+- **`TIPS_AND_TRICKS.md`**: Helpful hints for getting the most out of Pickle Rick.
 
 ## ⚙️ Configuration
 
@@ -191,6 +203,10 @@ The extension is configured via `gemini-extension.json`.
 ## 🛡️ Safety & Sandboxing
 
 **Pickle Rick executes code.** It is highly recommended to run this extension in a **sandboxed environment** (Docker container, VM, or a dedicated restricted shell) to prevent accidental system modifications.
+
+```bash
+gemini -s
+```
 
 ### Recommended Tool Restrictions
 To prevent the agent from accidentally pushing code or performing destructive git operations, we recommend explicitly defining allowed tools in your project's `.gemini/settings.json`:
@@ -221,6 +237,7 @@ To prevent the agent from accidentally pushing code or performing destructive gi
 
 *   **Rick Notifications**: Real-time OS notifications (or Rick shouting at you) when a task is complete or fails.
 *   **Jerry Mode Mitigation**: Ability for Rick to pause the loop and ask for human help if he gets stuck in a simulation (infinite error loop).
+*   **Token Accounting**: A breakdown of total tokens consumed (and cost) after a Pickle Rick session finishes.
 
 ---
 
